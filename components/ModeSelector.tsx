@@ -6,13 +6,13 @@ interface ModeSelectorProps {
     onModeSelect: (mode: StoryMode) => void;
 }
 
-const ModeCard: React.FC<{ title: string; description: string; onClick: () => void; icon: JSX.Element; }> = ({ title, description, onClick, icon }) => (
+const ModeCard: React.FC<{ title: string; description: string; onClick: () => void; icon: React.ReactElement; }> = ({ title, description, onClick, icon }) => (
     <div
         onClick={onClick}
         className="group relative bg-gray-800/50 border border-indigo-400/20 rounded-lg p-8 cursor-pointer hover:bg-indigo-900/40 hover:border-purple-400/50 transition-all duration-300 transform hover:-translate-y-1 overflow-hidden"
     >
         <div className="absolute top-0 right-0 text-indigo-500/10 transform translate-x-1/4 -translate-y-1/4 group-hover:text-purple-400/20 transition-colors duration-300">
-            {React.cloneElement(icon, { className: "w-48 h-48" })}
+            <div className="w-48 h-48">{icon}</div>
         </div>
         <div className="relative">
             <h3 className="text-3xl font-serif text-purple-300">{title}</h3>

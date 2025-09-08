@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Story } from '../types';
 
 interface StoryViewerProps {
@@ -9,6 +9,10 @@ interface StoryViewerProps {
 const StoryViewer: React.FC<StoryViewerProps> = ({ story, onRestart }) => {
     const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+    const [isAudioLoading, setIsAudioLoading] = useState(false);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
     
     const currentPanel = story.panels[currentPanelIndex];
 
@@ -20,15 +24,84 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ story, onRestart }) => {
         setCurrentPanelIndex(prev => (prev - 1 + story.panels.length) % story.panels.length);
     };
     
+    // Handle audio playback for current panel
     useEffect(() => {
-        // FIX: Replaced timer logic with a browser-compatible implementation that avoids NodeJS types.
-        if (isPlaying) {
-            const timer = setTimeout(goToNext, 5000);
-            return () => clearTimeout(timer);
+        if (currentPanel.audioUrl) {
+            // Stop any existing audio
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+            
+            // Create new audio element
+            const audio = new Audio(currentPanel.audioUrl);
+            audioRef.current = audio;
+            
+            // Set up event listeners
+            audio.addEventListener('loadstart', () => setIsAudioLoading(true));
+            audio.addEventListener('canplay', () => setIsAudioLoading(false));
+            audio.addEventListener('play', () => setIsAudioPlaying(true));
+            audio.addEventListener('pause', () => setIsAudioPlaying(false));
+            audio.addEventListener('ended', () => {
+                setIsAudioPlaying(false);
+                // Auto-advance to next panel when audio ends if in play mode
+                if (isPlaying) {
+                    goToNext();
+                }
+            });
+            
+            // Auto-play audio when panel changes
+            audio.play().catch(err => {
+                console.log('Audio autoplay prevented:', err);
+                // User interaction might be required
+            });
+            
+            return () => {
+                audio.pause();
+                audio.removeEventListener('loadstart', () => {});
+                audio.removeEventListener('canplay', () => {});
+                audio.removeEventListener('play', () => {});
+                audio.removeEventListener('pause', () => {});
+                audio.removeEventListener('ended', () => {});
+            };
         }
-    }, [isPlaying, currentPanelIndex, goToNext]);
+    }, [currentPanel.audioUrl, currentPanelIndex, isPlaying, goToNext]);
     
-    const togglePlay = () => setIsPlaying(!isPlaying);
+    // Handle auto-play slideshow
+    useEffect(() => {
+        if (isPlaying && !currentPanel.audioUrl) {
+            // If no audio, use timer for auto-advance
+            autoPlayTimerRef.current = setTimeout(goToNext, 5000);
+            return () => {
+                if (autoPlayTimerRef.current) {
+                    clearTimeout(autoPlayTimerRef.current);
+                }
+            };
+        }
+    }, [isPlaying, currentPanelIndex, goToNext, currentPanel.audioUrl]);
+    
+    const togglePlay = () => {
+        setIsPlaying(!isPlaying);
+        
+        // Toggle audio playback
+        if (audioRef.current) {
+            if (!isPlaying) {
+                audioRef.current.play().catch(err => console.log('Audio play failed:', err));
+            } else {
+                audioRef.current.pause();
+            }
+        }
+    };
+    
+    const toggleAudio = () => {
+        if (audioRef.current) {
+            if (isAudioPlaying) {
+                audioRef.current.pause();
+            } else {
+                audioRef.current.play().catch(err => console.log('Audio play failed:', err));
+            }
+        }
+    };
 
     return (
         <div className="animate-fade-in flex flex-col items-center">
@@ -61,6 +134,33 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ story, onRestart }) => {
                 <button onClick={goToNext} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 p-3 rounded-full hover:bg-black/80 transition-colors text-white">
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 </button>
+                
+                {/* Audio indicator */}
+                {currentPanel.audioUrl && (
+                    <div className="absolute top-4 right-4">
+                        {isAudioLoading ? (
+                            <div className="bg-black/50 p-2 rounded-full">
+                                <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        ) : (
+                            <button onClick={toggleAudio} className="bg-black/50 p-2 rounded-full hover:bg-black/80 transition-colors">
+                                {isAudioPlaying ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                                    </svg>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                                    </svg>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
             
             {/* Progress Dots */}
@@ -86,6 +186,14 @@ const StoryViewer: React.FC<StoryViewerProps> = ({ story, onRestart }) => {
                     Export Video
                 </button>
             </div>
+            
+            {/* Audio status indicator */}
+            {currentPanel.audioUrl && (
+                <div className="mt-4 text-sm text-indigo-300">
+                    {isAudioLoading ? 'Loading narration...' : 
+                     isAudioPlaying ? '🔊 Narration playing' : '🔇 Narration paused'}
+                </div>
+            )}
         </div>
     );
 };

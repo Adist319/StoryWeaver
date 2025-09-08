@@ -59,6 +59,7 @@ export interface StoryPanel {
     imageUrl: string;
     description: string;
     narration: string;
+    audioUrl?: string;
 }
 
 export interface Story {

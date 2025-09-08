@@ -2,7 +2,7 @@
 import React from 'react';
 import { Genre, StoryLength, PhotoRole } from './types';
 
-export const GENRE_DETAILS: { [key in Genre]: { icon: JSX.Element; description: string } } = {
+export const GENRE_DETAILS: { [key in Genre]: { icon: React.ReactElement; description: string } } = {
     [Genre.ADVENTURE]: { icon: <CompassIcon />, description: "Embark on a thrilling journey to uncharted territories." },
     [Genre.MYSTERY]: { icon: <SearchIcon />, description: "Unravel clues and solve a perplexing enigma." },
     [Genre.ROMANCE]: { icon: <HeartIcon />, description: "Experience a tale of passion, love, and connection." },

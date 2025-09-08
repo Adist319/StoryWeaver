@@ -8,6 +8,7 @@ import OptionsConfigurator from './components/OptionsConfigurator';
 import StoryGeneratorScreen from './components/StoryGeneratorScreen';
 import StoryViewer from './components/StoryViewer';
 import { generateStory } from './services/geminiService';
+import { generateMultipleNarrations, cleanupAudioUrls } from './services/elevenlabsService';
 
 const App: React.FC = () => {
     const [step, setStep] = useState<AppStep>(AppStep.MODE_SELECTION);
@@ -42,7 +43,33 @@ const App: React.FC = () => {
         setError(null);
 
         try {
+            // Generate the story with images
             const story = await generateStory(finalOptions);
+            
+            // Generate voice narration for each panel
+            try {
+                console.log('Starting voice generation for story panels...');
+                const narrationTexts = story.panels.map(panel => panel.narration);
+                console.log('Narration texts to generate:', narrationTexts);
+                
+                const audioResults = await generateMultipleNarrations(narrationTexts, finalOptions.genre);
+                console.log('Audio generation results:', audioResults);
+                
+                // Add audio URLs to story panels
+                story.panels.forEach((panel, index) => {
+                    if (audioResults[index]) {
+                        panel.audioUrl = audioResults[index].audioUrl;
+                        console.log(`Panel ${index + 1} audio URL set:`, panel.audioUrl);
+                    } else {
+                        console.warn(`No audio generated for panel ${index + 1}`);
+                    }
+                });
+                console.log('Voice narration successfully added to all panels');
+            } catch (audioError) {
+                console.error('Voice generation failed, continuing without audio:', audioError);
+                // Continue without audio if voice generation fails
+            }
+            
             setGeneratedStory(story);
             setStep(AppStep.VIEWING_STORY);
         } catch (err) {
